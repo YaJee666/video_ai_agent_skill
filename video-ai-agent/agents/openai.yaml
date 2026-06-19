@@ -1,0 +1,4 @@
+interface:
+  display_name: "Video AI Agent"
+  short_description: "Analyze and summarize online videos through Video AI Agent OpenAPI."
+  default_prompt: "Use $video-ai-agent to summarize this video URL."
