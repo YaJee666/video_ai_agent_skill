@@ -1,5 +1,7 @@
 # Video AI Agent Skill
 
+English version: [README_EN.md](README_EN.md)
+
 给 Codex、Claude Code 和其他 coding agent 一键装上在线视频理解能力。
 
 Video AI Agent Skill 是一个轻量级 folder-based skill。它不在本地下载、破解或清洗视频站点内容，而是把完整的视频理解请求发送到 Video AI Agent OpenAPI，由线上服务完成视频解析、字幕/转写、清洗、总结和问答。
