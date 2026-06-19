@@ -15,10 +15,11 @@ Security-conscious? Ask the agent to preview the install first:
 安装时使用 --dry-run 参数
 ```
 
-After installation, configure your API key in the shell that runs your agent:
+After installation, put your API key in the installed skill `.env` file:
 
 ```powershell
-$env:VIDEO_AI_AGENT_API_KEY = "vag_sk_live_xxx"
+Copy-Item "$env:USERPROFILE\.codex\skills\video-ai-agent\.env.example" "$env:USERPROFILE\.codex\skills\video-ai-agent\.env"
+notepad "$env:USERPROFILE\.codex\skills\video-ai-agent\.env"
 ```
 
 New users receive a USD 10 free credit for initial testing. Usage and remaining balance are shown in the Video AI Agent console.
@@ -39,6 +40,7 @@ Stay within these limits:
 
 - Do not install system packages.
 - Do not ask for or store API keys in the repository.
+- Store API keys in the installed skill `.env` file, not in the cloned repo, unless the user explicitly asks otherwise.
 - Do not commit secrets.
 - Do not modify projects in the user's current workspace except the dedicated install checkout under the user's home directory.
 - Do not overwrite unrelated skill folders.
@@ -126,18 +128,20 @@ Ask the user to create an API key in the Video AI Agent console with this minimu
 chat:write
 ```
 
-Then ask them to set it in the shell that runs their agent.
+Then ask them to write it into the installed skill `.env` file.
 
 PowerShell:
 
 ```powershell
-$env:VIDEO_AI_AGENT_API_KEY = "vag_sk_live_xxx"
+Copy-Item "$env:USERPROFILE\.codex\skills\video-ai-agent\.env.example" "$env:USERPROFILE\.codex\skills\video-ai-agent\.env"
+notepad "$env:USERPROFILE\.codex\skills\video-ai-agent\.env"
 ```
 
 Bash:
 
 ```bash
-export VIDEO_AI_AGENT_API_KEY="vag_sk_live_xxx"
+cp ~/.codex/skills/video-ai-agent/.env.example ~/.codex/skills/video-ai-agent/.env
+${EDITOR:-vi} ~/.codex/skills/video-ai-agent/.env
 ```
 
 Optional settings:
@@ -148,6 +152,8 @@ VIDEO_AI_AGENT_TIMEOUT_MS=600000
 VIDEO_AI_AGENT_PROJECT_ID=
 VIDEO_AI_AGENT_SESSION_ID=
 ```
+
+The client script loads `.env` from the current directory, the installed skill root, or the repository root. Precedence is: CLI args > shell environment > `.env`.
 
 ### Step 4: Verify
 
@@ -163,7 +169,7 @@ For Claude Code:
 python ~/.claude/skills/video-ai-agent/scripts/video_ai_agent_chat.py --help
 ```
 
-If `VIDEO_AI_AGENT_API_KEY` is configured, run a smoke test:
+If `VIDEO_AI_AGENT_API_KEY` is configured in `.env`, run a smoke test:
 
 ```bash
 python ~/.codex/skills/video-ai-agent/scripts/video_ai_agent_chat.py \

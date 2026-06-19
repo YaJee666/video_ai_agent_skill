@@ -40,20 +40,24 @@ The skill is intentionally plain: it contains `SKILL.md`, `references/`, `script
 
 ## Configure
 
-Set the API key in the shell that runs the agent:
+Preferred: create a `.env` file in the installed skill directory so every new agent session can reuse the same configuration.
 
 ```powershell
-$env:VIDEO_AI_AGENT_API_KEY = "vag_sk_live_xxx"
+Copy-Item "$env:USERPROFILE\.codex\skills\video-ai-agent\.env.example" "$env:USERPROFILE\.codex\skills\video-ai-agent\.env"
+notepad "$env:USERPROFILE\.codex\skills\video-ai-agent\.env"
 ```
 
-Optional settings:
+`.env` example:
 
-```powershell
-$env:VIDEO_AI_AGENT_ENDPOINT = "http://www.talkaibot.com/openapi/v1/chat/completions"
-$env:VIDEO_AI_AGENT_TIMEOUT_MS = "600000"
-$env:VIDEO_AI_AGENT_PROJECT_ID = "proj_xxx"
-$env:VIDEO_AI_AGENT_SESSION_ID = "session_xxx"
+```text
+VIDEO_AI_AGENT_API_KEY=vag_sk_live_xxx
+VIDEO_AI_AGENT_ENDPOINT=http://www.talkaibot.com/openapi/v1/chat/completions
+VIDEO_AI_AGENT_TIMEOUT_MS=600000
+VIDEO_AI_AGENT_PROJECT_ID=proj_xxx
+VIDEO_AI_AGENT_SESSION_ID=
 ```
+
+The client script loads `.env` from the current directory, the skill root, or the repository root. CLI arguments override shell environment variables, and shell environment variables override `.env`.
 
 ## Verify
 
@@ -72,6 +76,7 @@ python .\scripts\video_ai_agent_chat.py --message "Please summarize this video i
 ## Notes
 
 - Do not commit API keys to a repository.
+- Prefer the installed skill `.env` file for persistent local API key configuration.
 - Keep the full user request and video URLs in `messageContent`.
 - Use `sessionId` only when the user wants continuity across requests.
 - Use `projectId` only when the key's workspace owns that project.

@@ -11,12 +11,56 @@ import time
 import uuid
 import urllib.error
 import urllib.request
+from pathlib import Path
 from typing import Any
 
 
 DEFAULT_ENDPOINT = "http://www.talkaibot.com/openapi/v1/chat/completions"
 DEFAULT_TIMEOUT_MS = 600000
 SKILL_ID = "video-ai-agent"
+
+
+def _decode_env_value(value: str) -> str:
+    stripped = value.strip()
+    if len(stripped) >= 2 and stripped[0] == stripped[-1] and stripped[0] in {"'", '"'}:
+        return stripped[1:-1]
+    return stripped
+
+
+def load_dotenv_file(path: Path) -> None:
+    if not path.is_file():
+        return
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return
+    for raw_line in lines:
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.lstrip("\ufeff").strip()
+        if key.startswith("export "):
+            key = key[len("export "):].strip()
+        if not key or key in os.environ:
+            continue
+        os.environ[key] = _decode_env_value(value)
+
+
+def load_dotenv() -> None:
+    script_path = Path(__file__).resolve()
+    candidates = [
+        Path.cwd() / ".env",
+        script_path.parents[1] / ".env",
+        script_path.parents[2] / ".env",
+    ]
+    seen: set[Path] = set()
+    for candidate in candidates:
+        resolved = candidate.expanduser().resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        load_dotenv_file(resolved)
 
 
 def env(name: str, default: str = "") -> str:
@@ -156,6 +200,7 @@ def render_text(data: dict[str, Any]) -> str:
 
 
 def main() -> int:
+    load_dotenv()
     args = parse_args()
     payload = build_payload(args)
     data = post_json(args.endpoint.strip(), args.api_key.strip(), payload, args.timeout_ms)
