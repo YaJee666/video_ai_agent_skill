@@ -57,22 +57,34 @@ def load_dotenv_file(path: Path) -> dict[str, str]:
     return values
 
 
+def discover_dotenv_paths(script_path: Path, cwd: Path) -> list[Path]:
+    skill_root = script_path.parents[1]
+    paths = [
+        script_path.parents[2] / ".env",
+        skill_root / ".env",
+    ]
+
+    cwd_chain = [cwd, *cwd.parents]
+    for directory in reversed(cwd_chain):
+        paths.append(directory / ".env")
+
+    seen: set[Path] = set()
+    unique_paths: list[Path] = []
+    for path in paths:
+        resolved = path.expanduser().resolve()
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        unique_paths.append(resolved)
+    return unique_paths
+
+
 def load_dotenv() -> None:
     global DOTENV_VALUES
     DOTENV_VALUES = {}
     script_path = Path(__file__).resolve()
-    candidates = [
-        Path.cwd() / ".env",
-        script_path.parents[1] / ".env",
-        script_path.parents[2] / ".env",
-    ]
-    seen: set[Path] = set()
-    for candidate in candidates:
-        resolved = candidate.expanduser().resolve()
-        if resolved in seen:
-            continue
-        seen.add(resolved)
-        DOTENV_VALUES.update(load_dotenv_file(resolved))
+    for candidate in discover_dotenv_paths(script_path, Path.cwd()):
+        DOTENV_VALUES.update(load_dotenv_file(candidate))
 
 
 def env(name: str, default: str = "") -> str:
@@ -80,13 +92,16 @@ def env(name: str, default: str = "") -> str:
 
 
 def resolve_config_value(cli_value: str | None, env_name: str, default: str = "") -> str:
-    dotenv_value = DOTENV_VALUES.get(env_name, "").strip()
-    if dotenv_value:
-        return dotenv_value
+    cli = str(cli_value or "").strip()
+    if cli:
+        return cli
     env_value = env(env_name)
     if env_value:
         return env_value
-    return str(cli_value or default).strip()
+    dotenv_value = DOTENV_VALUES.get(env_name, "").strip()
+    if dotenv_value:
+        return dotenv_value
+    return str(default).strip()
 
 
 def resolve_timeout_ms(cli_value: int | None) -> int:

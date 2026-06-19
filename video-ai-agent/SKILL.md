@@ -9,9 +9,9 @@ Use this skill to send online video analysis, summarization, transcript insight 
 
 This skill is a lightweight client wrapper. It does not parse video sites locally. Put the user's complete intent and all video URLs in `messageContent`; the backend detects supported video links and runs the appropriate online video agent pipeline.
 
-## Required Configuration
+## Configuration
 
-Require a Video AI Agent API key created in the web console before calling the API.
+The bundled script loads Video AI Agent configuration automatically. Put the API key in the installed skill `.env` file for persistent local use, then agents can call the backend directly with only `--message`.
 
 Minimum key scope:
 
@@ -50,7 +50,7 @@ Use the bundled client script:
 python scripts/video_ai_agent_chat.py --message "Summarize this video in Chinese: https://www.bilibili.com/video/BV..."
 ```
 
-The script reads configuration from environment variables:
+The script automatically reads `.env` from the installed skill directory and from the current working directory hierarchy:
 
 ```text
 VIDEO_AI_AGENT_API_KEY
@@ -60,7 +60,7 @@ VIDEO_AI_AGENT_PROJECT_ID
 VIDEO_AI_AGENT_SESSION_ID
 ```
 
-CLI arguments override environment variables:
+Configuration precedence is `CLI arguments > shell environment > .env > defaults`. Only pass `--api-key` for a one-off override:
 
 ```bash
 python scripts/video_ai_agent_chat.py \
@@ -71,8 +71,8 @@ python scripts/video_ai_agent_chat.py \
 ## Workflow
 
 1. Confirm the user wants a video task or a Video AI Agent-backed chat task.
-2. Make sure an API key is available from `VIDEO_AI_AGENT_API_KEY` or an explicit `--api-key` value.
-3. Put the complete instruction, including all video URLs, into `--message`.
+2. Call `scripts/video_ai_agent_chat.py` directly with the complete instruction and all video URLs in `--message`.
+3. Do not preflight or print API key state; the script loads `.env` automatically and reports a clear configuration error if the key is missing.
 4. Preserve conversation continuity when useful with `--session-id`.
 5. Include `--project-id` only when the user wants the request associated with a known Video AI Agent project in the API key workspace.
 6. Return the backend response text and mention request/session IDs when useful for debugging.

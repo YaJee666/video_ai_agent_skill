@@ -40,7 +40,7 @@ The skill is intentionally plain: it contains `SKILL.md`, `references/`, `script
 
 ## Configure
 
-Preferred: create a `.env` file in the installed skill directory so every new agent session can reuse the same configuration.
+Preferred: create a `.env` file in the installed skill directory so every new agent session can call the backend without any preflight configuration checks.
 
 ```powershell
 Copy-Item "$env:USERPROFILE\.codex\skills\video-ai-agent\.env.example" "$env:USERPROFILE\.codex\skills\video-ai-agent\.env"
@@ -57,7 +57,7 @@ VIDEO_AI_AGENT_PROJECT_ID=proj_xxx
 VIDEO_AI_AGENT_SESSION_ID=
 ```
 
-The client script loads `.env` from the current directory, the skill root, or the repository root. Precedence is: `.env` > shell environment > CLI args.
+The client script loads `.env` from the installed skill directory and from the current working directory hierarchy. Precedence is: CLI args > shell environment > `.env` > defaults.
 
 ## Verify
 
@@ -77,6 +77,7 @@ python .\scripts\video_ai_agent_chat.py --message "Please summarize this video i
 
 - Do not commit API keys to a repository.
 - Prefer the installed skill `.env` file for persistent local API key configuration.
+- Agents should call the script directly for video tasks; let the script report missing or invalid configuration.
 - Keep the full user request and video URLs in `messageContent`.
 - Use `sessionId` only when the user wants continuity across requests.
 - Use `projectId` only when the key's workspace owns that project.
