@@ -21,6 +21,13 @@ SKILL_ID = "video-ai-agent"
 DOTENV_VALUES: dict[str, str] = {}
 
 
+def configure_utf8_output() -> None:
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(encoding="utf-8", errors="replace")
+
+
 def _decode_env_value(value: str) -> str:
     stripped = value.strip()
     if len(stripped) >= 2 and stripped[0] == stripped[-1] and stripped[0] in {"'", '"'}:
@@ -236,6 +243,7 @@ def render_text(data: dict[str, Any]) -> str:
 
 
 def main() -> int:
+    configure_utf8_output()
     load_dotenv()
     args = apply_config_precedence(parse_args())
     payload = build_payload(args)
