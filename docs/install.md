@@ -186,6 +186,12 @@ Example prompt:
 Use $video-ai-agent to summarize this video in Chinese: https://www.youtube.com/watch?v=...
 ```
 
+For future updates, give the user this one-liner:
+
+```text
+帮我更新 Video AI Agent Skill：https://raw.githubusercontent.com/YaJee666/video_ai_agent_skill/main/docs/update.md
+```
+
 ## Quick Reference
 
 | Command | What it does |
@@ -195,3 +201,4 @@ Use $video-ai-agent to summarize this video in Chinese: https://www.youtube.com/
 | `python scripts/install_skill.py --target claude` | Install into `~/.claude/skills/video-ai-agent` |
 | `python scripts/install_skill.py --target all` | Install into Codex, Claude Code, and generic `.agents` roots |
 | `python scripts/install_skill.py --target auto --dry-run` | Preview install actions |
+| `python scripts/install_skill.py --target auto --update` | Pull latest code and resync installed skills |
