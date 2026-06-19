@@ -12,7 +12,13 @@ New users receive a USD 10 free credit for initial testing. Actual usage and rem
 
 ## Install in Codex
 
-Copy the `video-ai-agent` folder into a Codex skills directory, for example:
+Preferred installer from this repository root:
+
+```powershell
+python .\scripts\install_skill.py --target codex
+```
+
+Manual fallback: copy the `video-ai-agent` folder into a Codex skills directory, for example:
 
 ```text
 %USERPROFILE%\.codex\skills\video-ai-agent
@@ -22,7 +28,13 @@ Then start a new Codex session so the skill metadata is discovered.
 
 ## Install in Claude Code
 
-Copy the `video-ai-agent` folder into a Claude Code skill location supported by your local setup, then start a new Claude Code session.
+Preferred installer from this repository root:
+
+```powershell
+python .\scripts\install_skill.py --target claude
+```
+
+Manual fallback: copy the `video-ai-agent` folder into a Claude Code skill location supported by your local setup, then start a new Claude Code session.
 
 The skill is intentionally plain: it contains `SKILL.md`, `references/`, `scripts/`, and `agents/`, so platforms that support folder-based skills can load the same package.
 
