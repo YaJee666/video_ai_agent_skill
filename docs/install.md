@@ -153,7 +153,7 @@ VIDEO_AI_AGENT_PROJECT_ID=
 VIDEO_AI_AGENT_SESSION_ID=
 ```
 
-The client script loads `.env` from the current directory, the installed skill root, or the repository root. Precedence is: CLI args > shell environment > `.env`.
+The client script loads `.env` from the current directory, the installed skill root, or the repository root. Precedence is: `.env` > shell environment > CLI args.
 
 ### Step 4: Verify
 

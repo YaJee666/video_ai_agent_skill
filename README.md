@@ -108,7 +108,7 @@ VIDEO_AI_AGENT_PROJECT_ID=
 VIDEO_AI_AGENT_SESSION_ID=
 ```
 
-脚本会自动读取当前目录、skill 目录或仓库根目录下的 `.env`。优先级是：命令行参数 > 系统环境变量 > `.env` 文件。
+脚本会自动读取当前目录、skill 目录或仓库根目录下的 `.env`。优先级是：`.env` 文件 > 系统环境变量 > 命令行参数。
 
 临时使用也可以继续设置环境变量：
 

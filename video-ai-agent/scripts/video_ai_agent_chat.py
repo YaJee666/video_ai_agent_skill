@@ -18,6 +18,7 @@ from typing import Any
 DEFAULT_ENDPOINT = "http://www.talkaibot.com/openapi/v1/chat/completions"
 DEFAULT_TIMEOUT_MS = 600000
 SKILL_ID = "video-ai-agent"
+DOTENV_VALUES: dict[str, str] = {}
 
 
 def _decode_env_value(value: str) -> str:
@@ -27,13 +28,14 @@ def _decode_env_value(value: str) -> str:
     return stripped
 
 
-def load_dotenv_file(path: Path) -> None:
+def load_dotenv_file(path: Path) -> dict[str, str]:
     if not path.is_file():
-        return
+        return {}
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
     except OSError:
-        return
+        return {}
+    values: dict[str, str] = {}
     for raw_line in lines:
         line = raw_line.strip()
         if not line or line.startswith("#") or "=" not in line:
@@ -42,12 +44,15 @@ def load_dotenv_file(path: Path) -> None:
         key = key.lstrip("\ufeff").strip()
         if key.startswith("export "):
             key = key[len("export "):].strip()
-        if not key or key in os.environ:
+        if not key:
             continue
-        os.environ[key] = _decode_env_value(value)
+        values[key] = _decode_env_value(value)
+    return values
 
 
 def load_dotenv() -> None:
+    global DOTENV_VALUES
+    DOTENV_VALUES = {}
     script_path = Path(__file__).resolve()
     candidates = [
         Path.cwd() / ".env",
@@ -60,29 +65,60 @@ def load_dotenv() -> None:
         if resolved in seen:
             continue
         seen.add(resolved)
-        load_dotenv_file(resolved)
+        DOTENV_VALUES.update(load_dotenv_file(resolved))
 
 
 def env(name: str, default: str = "") -> str:
     return os.environ.get(name, default).strip()
 
 
+def resolve_config_value(cli_value: str | None, env_name: str, default: str = "") -> str:
+    dotenv_value = DOTENV_VALUES.get(env_name, "").strip()
+    if dotenv_value:
+        return dotenv_value
+    env_value = env(env_name)
+    if env_value:
+        return env_value
+    return str(cli_value or default).strip()
+
+
+def resolve_timeout_ms(cli_value: int | None) -> int:
+    raw_value = resolve_config_value(
+        str(cli_value) if cli_value is not None else "",
+        "VIDEO_AI_AGENT_TIMEOUT_MS",
+        str(DEFAULT_TIMEOUT_MS),
+    )
+    try:
+        return int(raw_value)
+    except ValueError as exc:
+        raise SystemExit(f"VIDEO_AI_AGENT_TIMEOUT_MS must be an integer: {raw_value}") from exc
+
+
+def apply_config_precedence(args: argparse.Namespace) -> argparse.Namespace:
+    args.api_key = resolve_config_value(args.api_key, "VIDEO_AI_AGENT_API_KEY")
+    args.endpoint = resolve_config_value(args.endpoint, "VIDEO_AI_AGENT_ENDPOINT", DEFAULT_ENDPOINT)
+    args.timeout_ms = resolve_timeout_ms(args.timeout_ms)
+    args.project_id = resolve_config_value(args.project_id, "VIDEO_AI_AGENT_PROJECT_ID")
+    args.session_id = resolve_config_value(args.session_id, "VIDEO_AI_AGENT_SESSION_ID")
+    return args
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Call Video AI Agent OpenAPI chat completions.")
-    parser.add_argument("--api-key", default=env("VIDEO_AI_AGENT_API_KEY"), help="Video AI Agent API key.")
+    parser.add_argument("--api-key", default="", help="Video AI Agent API key.")
     parser.add_argument(
         "--endpoint",
-        default=env("VIDEO_AI_AGENT_ENDPOINT", DEFAULT_ENDPOINT),
+        default="",
         help=f"OpenAPI endpoint. Default: {DEFAULT_ENDPOINT}",
     )
     parser.add_argument(
         "--timeout-ms",
         type=int,
-        default=int(env("VIDEO_AI_AGENT_TIMEOUT_MS", str(DEFAULT_TIMEOUT_MS)) or DEFAULT_TIMEOUT_MS),
+        default=None,
         help=f"Request timeout in milliseconds. Default: {DEFAULT_TIMEOUT_MS}",
     )
-    parser.add_argument("--project-id", default=env("VIDEO_AI_AGENT_PROJECT_ID"), help="Optional project id.")
-    parser.add_argument("--session-id", default=env("VIDEO_AI_AGENT_SESSION_ID"), help="Optional session id.")
+    parser.add_argument("--project-id", default="", help="Optional project id.")
+    parser.add_argument("--session-id", default="", help="Optional session id.")
     parser.add_argument("--thread-id", default="", help="Optional thread id.")
     parser.add_argument("--request-id", default="", help="Optional request id.")
     parser.add_argument("--title", default="", help="Optional chat title.")
@@ -201,7 +237,7 @@ def render_text(data: dict[str, Any]) -> str:
 
 def main() -> int:
     load_dotenv()
-    args = parse_args()
+    args = apply_config_precedence(parse_args())
     payload = build_payload(args)
     data = post_json(args.endpoint.strip(), args.api_key.strip(), payload, args.timeout_ms)
     if args.json:

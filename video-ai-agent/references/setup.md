@@ -57,7 +57,7 @@ VIDEO_AI_AGENT_PROJECT_ID=proj_xxx
 VIDEO_AI_AGENT_SESSION_ID=
 ```
 
-The client script loads `.env` from the current directory, the skill root, or the repository root. CLI arguments override shell environment variables, and shell environment variables override `.env`.
+The client script loads `.env` from the current directory, the skill root, or the repository root. Precedence is: `.env` > shell environment > CLI args.
 
 ## Verify
 
