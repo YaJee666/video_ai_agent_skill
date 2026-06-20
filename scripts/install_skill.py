@@ -77,21 +77,37 @@ def restore_env(destination: Path, env_content: bytes | None) -> None:
     (destination / ".env").write_bytes(env_content)
 
 
-def copy_skill(source: Path, destination: Path, *, dry_run: bool) -> None:
+def find_seed_env(targets: list[tuple[str, Path]]) -> bytes | None:
+    for _name, root in targets:
+        env_content = read_existing_env(root / SKILL_NAME)
+        if env_content is not None:
+            return env_content
+    return None
+
+
+def copy_skill(source: Path, destination: Path, *, dry_run: bool, seed_env: bytes | None = None) -> None:
+    existing_env = read_existing_env(destination)
+    env_content = existing_env if existing_env is not None else seed_env
     if dry_run:
         action = "replace" if destination.exists() else "create"
-        env_note = " and preserve .env" if (destination / ".env").is_file() else ""
+        if existing_env is not None:
+            env_note = " and preserve .env"
+        elif seed_env is not None:
+            env_note = " and seed .env from another selected install"
+        else:
+            env_note = ""
         print(f"[dry-run] Would {action}: {destination}{env_note}")
         return
     destination.parent.mkdir(parents=True, exist_ok=True)
-    existing_env = read_existing_env(destination)
     if destination.exists() or destination.is_symlink():
         remove_existing(destination)
     shutil.copytree(source, destination)
-    restore_env(destination, existing_env)
+    restore_env(destination, env_content)
     print(f"Installed: {destination}")
     if existing_env is not None:
         print(f"Preserved: {destination / '.env'}")
+    elif seed_env is not None:
+        print(f"Seeded: {destination / '.env'}")
 
 
 def update_repository(*, dry_run: bool) -> None:
@@ -132,9 +148,10 @@ def main() -> int:
     print("Video AI Agent Skill Installer")
     print("=" * 36)
     print(f"Source: {source}")
+    seed_env = find_seed_env(targets)
     for name, root in targets:
         destination = root / SKILL_NAME
-        copy_skill(source, destination, dry_run=args.dry_run)
+        copy_skill(source, destination, dry_run=args.dry_run, seed_env=seed_env)
 
     if not args.dry_run:
         print()
