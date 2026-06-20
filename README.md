@@ -56,7 +56,9 @@ Agent 会按安装指南 clone 仓库，并运行无依赖安装脚本，把 `vi
 
 ### 2. 获取 API key
 
-登录 Video AI Agent Web 控制台，在目标 workspace 创建 API key，并勾选最小权限：
+打开 Video AI Agent 控制台，在 `API Key` 页面创建 workspace API key：
+
+https://www.talkaibot.com/console?tab=keys
 
 ```text
 chat:write
@@ -215,7 +217,7 @@ python .\video-ai-agent\scripts\video_ai_agent_chat.py --timeout-ms 900000 --mes
 帮我更新 Video AI Agent Skill：https://raw.githubusercontent.com/YaJee666/video_ai_agent_skill/main/docs/update.md
 ```
 
-更新脚本会优先使用本地仓库、已安装 skill 目录对应的缓存 checkout，或 `~/.video-ai-agent-skill/repo` 作为源；缺少源仓库时会自动从 GitHub 拉取一份缓存副本。然后它会重新同步 `video-ai-agent` skill 目录，并保留已安装目录里的 `.env`，所以 API key 不需要重新配置。需要的话也可以用 `--source-repo` 指定自己的源码 checkout。
+更新脚本需要在仓库 checkout 里运行，先 `git pull --ff-only`，再重新同步 `video-ai-agent` skill 目录；它会保留已安装目录里的 `.env`，所以 API key 不需要重新配置。
 
 ### 可以把 API key 写进命令吗？
 
