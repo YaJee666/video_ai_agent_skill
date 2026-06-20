@@ -5,7 +5,7 @@
 1. Sign in to the Video AI Agent web app.
 2. Open the API key or console page for the target workspace.
 3. Create an API key.
-4. Include the `chat:write` scope.
+4. Include the `jobs:write` and `jobs:read` scopes for default jobs mode. Add `chat:write` only if you plan to use `--mode sync`.
 5. Copy the `vag_sk_...` key when it is shown. It is only displayed once.
 
 New users receive a USD 10 free credit for initial testing. Actual usage and remaining balance are shown in the Video AI Agent console.
@@ -52,6 +52,7 @@ notepad "$env:USERPROFILE\.codex\skills\video-ai-agent\.env"
 ```text
 VIDEO_AI_AGENT_API_KEY=vag_sk_live_xxx
 VIDEO_AI_AGENT_ENDPOINT=https://www.talkaibot.com/openapi/v1/chat/completions
+VIDEO_AI_AGENT_MODE=jobs
 VIDEO_AI_AGENT_TIMEOUT_MS=600000
 VIDEO_AI_AGENT_PROJECT_ID=proj_xxx
 VIDEO_AI_AGENT_SESSION_ID=
@@ -87,4 +88,6 @@ python .\scripts\video_ai_agent_chat.py --message "Please summarize this video i
 - Keep the full user request and video URLs in `messageContent`.
 - Use `sessionId` only when the user wants continuity across requests.
 - Use `projectId` only when the key's workspace owns that project.
-- Increase `VIDEO_AI_AGENT_TIMEOUT_MS` for long videos.
+- Keep `VIDEO_AI_AGENT_MODE=jobs` for long video parsing, summarization, transcript cleanup, and Q&A.
+- Use `--mode sync` only for short chat-completion requests.
+- Increase `VIDEO_AI_AGENT_TIMEOUT_MS` if the job polling window is too short.
