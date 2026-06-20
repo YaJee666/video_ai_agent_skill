@@ -15,7 +15,8 @@ The bundled script loads Video AI Agent configuration automatically. Put the API
 
 Minimum key scope:
 
-- `chat:write`
+- `jobs:write` and `jobs:read` for the default long-running jobs mode
+- `chat:write` only when using `--mode sync`
 
 Default endpoint:
 
@@ -55,6 +56,7 @@ The script automatically reads `.env` from the installed skill directory and fro
 ```text
 VIDEO_AI_AGENT_API_KEY
 VIDEO_AI_AGENT_ENDPOINT
+VIDEO_AI_AGENT_MODE
 VIDEO_AI_AGENT_TIMEOUT_MS
 VIDEO_AI_AGENT_PROJECT_ID
 VIDEO_AI_AGENT_SESSION_ID
@@ -77,7 +79,7 @@ python scripts/video_ai_agent_chat.py --debug-config
 ## Workflow
 
 1. Confirm the user wants a video task or a Video AI Agent-backed chat task.
-2. Call `scripts/video_ai_agent_chat.py` directly with the complete instruction and all video URLs in `--message`.
+2. Call `scripts/video_ai_agent_chat.py` directly with the complete instruction and all video URLs in `--message`; the default `jobs` mode is for long video work.
 3. Do not preflight or print API key state; the script loads `.env` automatically and reports a clear configuration error if the key is missing.
 4. Preserve conversation continuity when useful with `--session-id`.
 5. Include `--project-id` only when the user wants the request associated with a known Video AI Agent project in the API key workspace.
@@ -85,7 +87,28 @@ python scripts/video_ai_agent_chat.py --debug-config
 
 ## Request Shape
 
-The script sends JSON compatible with `POST /openapi/v1/chat/completions`:
+By default, the script creates a job with `POST /openapi/v1/jobs` and polls it until completion. Use `--mode sync` only for short chat-completion requests.
+
+Jobs mode wraps the user intent as:
+
+```json
+{
+  "requestId": "req_agent_skill_...",
+  "projectId": "optional project id",
+  "workflowPreset": "video.qa.basic",
+  "jobType": "video_ai_agent_skill",
+  "input": {
+    "messageContent": "full user intent and video URLs",
+    "sessionId": "optional session id"
+  },
+  "metadata": {
+    "request_source": "agent_skill_jobs",
+    "skill_id": "video-ai-agent"
+  }
+}
+```
+
+Sync mode sends JSON compatible with `POST /openapi/v1/chat/completions`:
 
 ```json
 {

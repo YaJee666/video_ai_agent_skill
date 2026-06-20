@@ -105,12 +105,14 @@ notepad "$env:USERPROFILE\.codex\skills\video-ai-agent\.env"
 ```text
 VIDEO_AI_AGENT_API_KEY=vag_sk_live_xxx
 VIDEO_AI_AGENT_ENDPOINT=https://www.talkaibot.com/openapi/v1/chat/completions
+VIDEO_AI_AGENT_MODE=jobs
 VIDEO_AI_AGENT_TIMEOUT_MS=600000
 VIDEO_AI_AGENT_PROJECT_ID=
 VIDEO_AI_AGENT_SESSION_ID=
 ```
 
 脚本会自动读取当前目录、skill 目录或仓库根目录下的 `.env`。优先级是：命令行参数 > 系统环境变量 > `.env` 文件 > 默认值。
+默认 `jobs` 模式会调用 `/openapi/v1/jobs` 并轮询结果，适合视频解析、总结、转写清洗和问答；短对话才使用 `--mode sync`。
 
 无需发送请求即可检查配置来源：
 
