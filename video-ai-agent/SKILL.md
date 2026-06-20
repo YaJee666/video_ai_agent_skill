@@ -7,7 +7,7 @@ description: Call the Video AI Agent OpenAPI from Codex, Claude Code, or other c
 
 Use this skill to send online video analysis, summarization, transcript insight extraction, comparison, and Q&A requests to the Video AI Agent platform through its OpenAPI endpoint.
 
-This skill is a lightweight client wrapper. It does not parse video sites locally. Put the user's complete intent and all video URLs in `messageContent`; the backend detects supported video links and runs the appropriate online video agent pipeline.
+This skill is a lightweight client wrapper. It does not download or transcribe video locally. Put the user's complete intent and all video URLs in `messageContent`; the client also auto-extracts structured `source_url` / `video_id` fields so the backend can route the right video pipeline.
 
 ## Configuration
 

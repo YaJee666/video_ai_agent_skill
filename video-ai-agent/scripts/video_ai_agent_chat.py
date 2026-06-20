@@ -7,6 +7,7 @@ import argparse
 import http.client
 import json
 import os
+import re
 import socket
 import ssl
 import sys
@@ -14,6 +15,7 @@ import time
 import uuid
 import urllib.error
 import urllib.request
+import urllib.parse
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +28,10 @@ DEFAULT_TIMEOUT_MS = 600000
 SKILL_ID = "video-ai-agent"
 DOTENV_VALUES: dict[str, str] = {}
 DOTENV_SOURCES: dict[str, str] = {}
+YOUTUBE_HOSTS = {"youtube.com", "www.youtube.com", "m.youtube.com", "youtu.be", "www.youtu.be"}
+BILIBILI_HOSTS = {"bilibili.com", "www.bilibili.com", "m.bilibili.com", "b23.tv"}
+DOUYIN_HOSTS = {"douyin.com", "www.douyin.com", "v.douyin.com"}
+TIKTOK_HOSTS = {"tiktok.com", "www.tiktok.com", "vm.tiktok.com"}
 
 
 def configure_utf8_output() -> None:
@@ -236,30 +242,109 @@ def compact(value: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def arg_text(args: argparse.Namespace, name: str) -> str:
+    return str(getattr(args, name, "") or "").strip()
+
+
+def extract_first_supported_video_source(message: str) -> dict[str, str]:
+    url_pattern = re.compile(r"https?://[^\s)>\]\"']+")
+    for raw_url in url_pattern.findall(message):
+        parsed = urllib.parse.urlparse(raw_url)
+        host = parsed.netloc.lower()
+        path = parsed.path or ""
+        query = urllib.parse.parse_qs(parsed.query)
+
+        if host in YOUTUBE_HOSTS:
+            video_id = ""
+            if host.endswith("youtu.be"):
+                video_id = path.lstrip("/").split("/", 1)[0]
+            elif path.startswith("/shorts/"):
+                video_id = path.split("/shorts/", 1)[1].split("/", 1)[0]
+            else:
+                video_id = query.get("v", [""])[0]
+            return compact(
+                {
+                    "source_url": raw_url.rstrip(".,;"),
+                    "video_url": raw_url.rstrip(".,;"),
+                    "video_id": video_id.strip(),
+                    "platform": "youtube",
+                }
+            )
+
+        if host in BILIBILI_HOSTS:
+            bvid_match = re.search(r"(BV[0-9A-Za-z]{10})", raw_url, re.IGNORECASE)
+            bvid = bvid_match.group(1) if bvid_match else ""
+            return compact(
+                {
+                    "source_url": raw_url.rstrip(".,;"),
+                    "video_url": raw_url.rstrip(".,;"),
+                    "video_id": bvid.strip(),
+                    "platform": "bilibili",
+                }
+            )
+
+        if host in DOUYIN_HOSTS:
+            return compact(
+                {
+                    "source_url": raw_url.rstrip(".,;"),
+                    "video_url": raw_url.rstrip(".,;"),
+                    "platform": "douyin",
+                }
+            )
+
+        if host in TIKTOK_HOSTS:
+            return compact(
+                {
+                    "source_url": raw_url.rstrip(".,;"),
+                    "video_url": raw_url.rstrip(".,;"),
+                    "platform": "tiktok",
+                }
+            )
+
+    return {}
+
+
 def build_payload(args: argparse.Namespace) -> dict[str, Any]:
-    message = args.message.strip() or sys.stdin.read().strip()
+    message = arg_text(args, "message") or sys.stdin.read().strip()
     if not message:
         raise SystemExit("message is required. Pass --message or pipe text on stdin.")
 
-    request_id = args.request_id.strip() or f"req_agent_skill_{int(time.time() * 1000)}_{uuid.uuid4().hex[:8]}"
+    request_id = arg_text(args, "request_id") or f"req_agent_skill_{int(time.time() * 1000)}_{uuid.uuid4().hex[:8]}"
     metadata = normalize_metadata(args.metadata)
+    video_source = extract_first_supported_video_source(message)
     metadata.update(
         {
             "request_source": "agent_skill",
             "skill_id": SKILL_ID,
             "client_request_id": request_id,
             "client_timestamp_ms": int(time.time() * 1000),
+            **video_source,
+        }
+    )
+
+    video_context = compact(
+        {
+            "videoId": video_source.get("video_id", ""),
+            "videoUrl": video_source.get("video_url", ""),
+            "sourceUrl": video_source.get("source_url", ""),
+            "videoContent": "",
+            "platform": video_source.get("platform", ""),
         }
     )
 
     return compact(
         {
             "requestId": request_id,
-            "projectId": args.project_id.strip(),
-            "sessionId": args.session_id.strip(),
-            "threadId": args.thread_id.strip(),
-            "title": args.title.strip(),
+            "projectId": arg_text(args, "project_id"),
+            "sessionId": arg_text(args, "session_id"),
+            "threadId": arg_text(args, "thread_id"),
+            "title": arg_text(args, "title"),
             "messageContent": message,
+            "context": video_context,
+            "source_url": video_source.get("source_url", ""),
+            "video_url": video_source.get("video_url", ""),
+            "video_id": video_source.get("video_id", ""),
+            "platform": video_source.get("platform", ""),
             "metadata": metadata,
         }
     )
@@ -423,6 +508,7 @@ def get_json(endpoint: str, api_key: str, payload: dict[str, Any], timeout_ms: i
 def build_job_payload(args: argparse.Namespace, chat_payload: dict[str, Any]) -> dict[str, Any]:
     metadata = dict(chat_payload.get("metadata") or {})
     metadata["request_source"] = "agent_skill_jobs"
+    video_context = dict(chat_payload.get("context") or {})
     return compact(
         {
             "requestId": chat_payload.get("requestId"),
@@ -431,9 +517,15 @@ def build_job_payload(args: argparse.Namespace, chat_payload: dict[str, Any]) ->
             "jobType": "video_ai_agent_skill",
             "input": {
                 "messageContent": chat_payload.get("messageContent", ""),
+                "message_content": chat_payload.get("messageContent", ""),
                 "sessionId": chat_payload.get("sessionId", ""),
                 "threadId": chat_payload.get("threadId", ""),
                 "title": chat_payload.get("title", ""),
+                "source_url": chat_payload.get("source_url", ""),
+                "video_url": chat_payload.get("video_url", ""),
+                "video_id": chat_payload.get("video_id", ""),
+                "platform": chat_payload.get("platform", ""),
+                "context": video_context,
                 "metadata": metadata,
             },
             "runtimeContext": {

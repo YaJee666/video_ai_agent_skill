@@ -59,6 +59,7 @@ VIDEO_AI_AGENT_SESSION_ID=
 ```
 
 The client script loads `.env` from the installed skill directory and from the current working directory hierarchy. Precedence is: CLI args > shell environment > `.env` > defaults.
+When a supported video URL is present in `--message`, the client auto-adds structured `source_url`, `video_id`, and `context` fields for the backend runtime.
 
 To inspect resolved configuration without sending a request:
 

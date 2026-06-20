@@ -98,6 +98,31 @@ class VideoAiAgentChatClientTest(unittest.TestCase):
         self.assertIn("VIDEO_AI_AGENT_API_KEY=vag_sk_...wxyz", rendered)
         self.assertNotIn("abcdefghijklmnopqrstuvwxyz", rendered)
 
+    def test_build_payload_extracts_youtube_video_source(self):
+        args = argparse.Namespace(
+            api_key="",
+            endpoint="",
+            mode="jobs",
+            timeout_ms=None,
+            project_id="",
+            session_id="",
+            request_id="req_test_42",
+            title="",
+            message="Please summarize this video: https://www.youtube.com/watch?v=N9iLEhievoM",
+            metadata="",
+        )
+
+        payload = self.client.build_payload(args)
+
+        self.assertEqual("https://www.youtube.com/watch?v=N9iLEhievoM", payload["source_url"])
+        self.assertEqual("https://www.youtube.com/watch?v=N9iLEhievoM", payload["video_url"])
+        self.assertEqual("N9iLEhievoM", payload["video_id"])
+        self.assertEqual("youtube", payload["platform"])
+        self.assertEqual("https://www.youtube.com/watch?v=N9iLEhievoM", payload["context"]["sourceUrl"])
+        self.assertEqual("N9iLEhievoM", payload["context"]["videoId"])
+        self.assertEqual("youtube", payload["metadata"]["platform"])
+        self.assertEqual("N9iLEhievoM", payload["metadata"]["video_id"])
+
     def test_remote_disconnect_error_includes_request_context(self):
         payload = {"requestId": "req_test_1", "messageContent": "hello"}
 
