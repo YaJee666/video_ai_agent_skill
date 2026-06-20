@@ -87,6 +87,7 @@ python .\scripts\install_skill.py --target codex
 python .\scripts\install_skill.py --target claude
 python .\scripts\install_skill.py --target all
 python .\scripts\install_skill.py --target auto --dry-run
+python .\scripts\install_skill.py --target auto --update
 ```
 
 ### 4. 配置 `.env`
@@ -214,7 +215,7 @@ python .\video-ai-agent\scripts\video_ai_agent_chat.py --timeout-ms 900000 --mes
 帮我更新 Video AI Agent Skill：https://raw.githubusercontent.com/YaJee666/video_ai_agent_skill/main/docs/update.md
 ```
 
-更新脚本会先 `git pull --ff-only`，再重新同步 `video-ai-agent` skill 目录，并保留已安装目录里的 `.env`，所以 API key 不需要重新配置。
+更新脚本会优先使用本地仓库、已安装 skill 目录对应的缓存 checkout，或 `~/.video-ai-agent-skill/repo` 作为源；缺少源仓库时会自动从 GitHub 拉取一份缓存副本。然后它会重新同步 `video-ai-agent` skill 目录，并保留已安装目录里的 `.env`，所以 API key 不需要重新配置。需要的话也可以用 `--source-repo` 指定自己的源码 checkout。
 
 ### 可以把 API key 写进命令吗？
 

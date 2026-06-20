@@ -61,6 +61,14 @@ VIDEO_AI_AGENT_SESSION_ID=
 The client script loads `.env` from the installed skill directory and from the current working directory hierarchy. Precedence is: CLI args > shell environment > `.env` > defaults.
 When a supported video URL is present in `--message`, the client auto-adds structured `source_url`, `video_id`, and `context` fields for the backend runtime.
 
+To refresh an installed Codex or Claude Code skill, the same installer script can bootstrap or reuse a cached source checkout automatically:
+
+```powershell
+python .\scripts\install_skill.py --target auto --update
+```
+
+If you want to point at a specific checkout or mirror, add `--source-repo "C:\path\to\video_ai_agent_skill"`.
+
 To inspect resolved configuration without sending a request:
 
 ```powershell

@@ -2,6 +2,7 @@ import importlib.util
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 
 SCRIPT_PATH = Path(__file__).resolve().parents[1] / "scripts" / "install_skill.py"
@@ -76,6 +77,46 @@ class InstallSkillTest(unittest.TestCase):
                 b"VIDEO_AI_AGENT_API_KEY=vag_sk_existing\n",
                 (destination / ".env").read_bytes(),
             )
+
+    def test_resolve_skill_folder_accepts_repo_root_or_skill_folder(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            repo_root = root / "repo"
+            skill_folder = repo_root / self.installer.SKILL_NAME
+            skill_folder.mkdir(parents=True)
+            (skill_folder / "SKILL.md").write_text("# skill\n", encoding="utf-8")
+
+            self.assertEqual(skill_folder, self.installer.resolve_skill_folder(repo_root))
+            self.assertEqual(skill_folder, self.installer.resolve_skill_folder(skill_folder))
+
+    def test_update_source_checkout_bootstraps_missing_repo_then_pulls(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source_repo = root / "cache" / "repo"
+            clone_result = mock.MagicMock(returncode=0)
+            pull_result = mock.MagicMock(returncode=0)
+
+            with mock.patch.object(self.installer.subprocess, "run", side_effect=[clone_result, pull_result]) as run_mock:
+                returned = self.installer.update_source_checkout(source_repo, dry_run=False)
+
+            self.assertEqual(source_repo, returned)
+            self.assertEqual(2, run_mock.call_count)
+            self.assertEqual(["git", "clone", self.installer.DEFAULT_REPO_URL, str(source_repo)], run_mock.call_args_list[0].args[0])
+            self.assertEqual(source_repo, run_mock.call_args_list[1].kwargs["cwd"])
+            self.assertEqual(["git", "pull", "--ff-only"], run_mock.call_args_list[1].args[0])
+
+    def test_update_source_checkout_dry_run_reports_clone_and_pull(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source_repo = root / "cache" / "repo"
+
+            with mock.patch("builtins.print") as print_mock:
+                returned = self.installer.update_source_checkout(source_repo, dry_run=True)
+
+            self.assertEqual(source_repo, returned)
+            printed = "\n".join(" ".join(str(arg) for arg in call.args) for call in print_mock.call_args_list)
+            self.assertIn("Would clone", printed)
+            self.assertIn("Would run in", printed)
 
 
 if __name__ == "__main__":

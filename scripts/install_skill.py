@@ -12,17 +12,38 @@ from pathlib import Path
 
 
 SKILL_NAME = "video-ai-agent"
+DEFAULT_REPO_URL = "https://github.com/YaJee666/video_ai_agent_skill.git"
+DEFAULT_SOURCE_CACHE = Path.home() / ".video-ai-agent-skill" / "repo"
 
 
-def repo_root() -> Path:
-    return Path(__file__).resolve().parents[1]
+def current_checkout_root() -> Path | None:
+    candidate = Path(__file__).resolve().parents[2]
+    if (candidate / ".git").is_dir():
+        return candidate
+    return None
+
+
+def configured_source_repo() -> Path:
+    env_value = os.environ.get("VIDEO_AI_AGENT_SOURCE_REPO", "").strip()
+    if env_value:
+        return Path(env_value).expanduser()
+    checkout = current_checkout_root()
+    if checkout is not None:
+        return checkout
+    return DEFAULT_SOURCE_CACHE
+
+
+def resolve_skill_folder(source_repo: Path) -> Path:
+    if (source_repo / "SKILL.md").is_file():
+        return source_repo
+    candidate = source_repo / SKILL_NAME
+    if (candidate / "SKILL.md").is_file():
+        return candidate
+    raise SystemExit(f"Skill source not found: {source_repo}")
 
 
 def skill_source() -> Path:
-    source = repo_root() / SKILL_NAME
-    if not (source / "SKILL.md").is_file():
-        raise SystemExit(f"Skill source not found: {source}")
-    return source
+    return resolve_skill_folder(configured_source_repo())
 
 
 def home() -> Path:
@@ -85,6 +106,33 @@ def find_seed_env(targets: list[tuple[str, Path]]) -> bytes | None:
     return None
 
 
+def ensure_source_checkout(source_repo: Path, *, dry_run: bool) -> Path:
+    if (source_repo / ".git").is_dir():
+        return source_repo
+    if dry_run:
+        print(f"[dry-run] Would clone {DEFAULT_REPO_URL} to {source_repo}")
+        return source_repo
+    print(f"Bootstrapping source checkout at: {source_repo}")
+    source_repo.parent.mkdir(parents=True, exist_ok=True)
+    result = subprocess.run(["git", "clone", DEFAULT_REPO_URL, str(source_repo)], text=True)
+    if result.returncode != 0:
+        raise SystemExit(f"git clone failed for {DEFAULT_REPO_URL}")
+    return source_repo
+
+
+def update_source_checkout(source_repo: Path, *, dry_run: bool) -> Path:
+    checkout = ensure_source_checkout(source_repo, dry_run=dry_run)
+    command = ["git", "pull", "--ff-only"]
+    if dry_run:
+        print(f"[dry-run] Would run in {checkout}: {' '.join(command)}")
+        return checkout
+    print(f"Updating repository: {checkout}")
+    result = subprocess.run(command, cwd=checkout, text=True)
+    if result.returncode != 0:
+        raise SystemExit("git pull --ff-only failed. Resolve local changes or update the checkout manually.")
+    return checkout
+
+
 def copy_skill(source: Path, destination: Path, *, dry_run: bool, seed_env: bytes | None = None) -> None:
     existing_env = read_existing_env(destination)
     env_content = existing_env if existing_env is not None else seed_env
@@ -110,21 +158,6 @@ def copy_skill(source: Path, destination: Path, *, dry_run: bool, seed_env: byte
         print(f"Seeded: {destination / '.env'}")
 
 
-def update_repository(*, dry_run: bool) -> None:
-    root = repo_root()
-    if not (root / ".git").is_dir():
-        print("Repository update skipped: this is not a git checkout.")
-        return
-    command = ["git", "pull", "--ff-only"]
-    if dry_run:
-        print(f"[dry-run] Would run in {root}: {' '.join(command)}")
-        return
-    print("Updating repository...")
-    result = subprocess.run(command, cwd=root, text=True)
-    if result.returncode != 0:
-        raise SystemExit("git pull --ff-only failed. Resolve local changes or update the checkout manually.")
-
-
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Install Video AI Agent skill into agent skill directories.")
     parser.add_argument(
@@ -133,6 +166,11 @@ def parse_args() -> argparse.Namespace:
         default="auto",
         help="Install target. Default: auto.",
     )
+    parser.add_argument(
+        "--source-repo",
+        default="",
+        help="Path to the upstream repository checkout or skill folder to copy from.",
+    )
     parser.add_argument("--dry-run", action="store_true", help="Preview install actions without writing files.")
     parser.add_argument("--update", action="store_true", help="Pull latest repository changes before installing.")
     return parser.parse_args()
@@ -140,9 +178,10 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
+    source_repo = Path(args.source_repo).expanduser() if str(args.source_repo or "").strip() else configured_source_repo()
     if args.update:
-        update_repository(dry_run=args.dry_run)
-    source = skill_source()
+        source_repo = update_source_checkout(source_repo, dry_run=args.dry_run)
+    source = resolve_skill_folder(source_repo)
     targets = selected_roots(args.target)
 
     print("Video AI Agent Skill Installer")

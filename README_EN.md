@@ -83,6 +83,7 @@ python .\scripts\install_skill.py --target codex
 python .\scripts\install_skill.py --target claude
 python .\scripts\install_skill.py --target all
 python .\scripts\install_skill.py --target auto --dry-run
+python .\scripts\install_skill.py --target auto --update
 ```
 
 ### 4. Configure `.env`
@@ -144,7 +145,7 @@ Use the update guide:
 Update Video AI Agent Skill: https://raw.githubusercontent.com/YaJee666/video_ai_agent_skill/main/docs/update.md
 ```
 
-The update flow pulls the latest repository code, resyncs the skill folder, and preserves installed `.env` files, so the API key does not need to be re-entered.
+The update flow can use the local repo, an installed skill copy, or the cached checkout under `~/.video-ai-agent-skill/repo`. If no source checkout exists yet, the updater bootstraps one from GitHub, then resyncs the skill folder and preserves installed `.env` files. You can also point it at a custom checkout with `--source-repo`.
 
 ## Why Online Parsing Helps
 
@@ -204,7 +205,7 @@ Yes. Use `VIDEO_AI_AGENT_SESSION_ID` or `--session-id`.
 
 ### How do I update the skill?
 
-Copy the update one-liner to your agent or use the local update script. The update keeps the installed `.env` file.
+Copy the update one-liner to your agent or use the local update script. The update keeps the installed `.env` file and can bootstrap the cached source checkout automatically.
 
 ### Can I put the API key directly on the command line?
 
