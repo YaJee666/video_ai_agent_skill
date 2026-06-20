@@ -436,7 +436,7 @@ def post_json(endpoint: str, api_key: str, payload: dict[str, Any], timeout_ms: 
             raw = response.read().decode("utf-8", errors="replace")
     except urllib.error.HTTPError as exc:
         raw = exc.read().decode("utf-8", errors="replace")
-        message = raw[:1000] if raw else str(exc.reason or "Service Unavailable")
+        message = summarize_http_error(raw) or str(exc.reason or "Service Unavailable")
         detail = request_debug(payload, endpoint, timeout_ms)
         raise SystemExit(f"Video AI Agent HTTP {exc.code}: {message}\n[video_ai_agent] {detail}") from exc
     except urllib.error.URLError as exc:
@@ -477,7 +477,7 @@ def get_json(endpoint: str, api_key: str, payload: dict[str, Any], timeout_ms: i
             raw = response.read().decode("utf-8", errors="replace")
     except urllib.error.HTTPError as exc:
         raw = exc.read().decode("utf-8", errors="replace")
-        message = raw[:1000] if raw else str(exc.reason or "Service Unavailable")
+        message = summarize_http_error(raw) or str(exc.reason or "Service Unavailable")
         detail = request_debug(payload, endpoint, timeout_ms)
         raise SystemExit(f"Video AI Agent HTTP {exc.code}: {message}\n[video_ai_agent] {detail}") from exc
     except urllib.error.URLError as exc:
@@ -536,6 +536,36 @@ def build_job_payload(args: argparse.Namespace, chat_payload: dict[str, Any]) ->
             "metadata": metadata,
         }
     )
+
+
+def summarize_http_error(raw: str) -> str:
+    if not raw:
+        return ""
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return raw[:1000]
+    if not isinstance(data, dict):
+        return raw[:1000]
+
+    error_payload = data.get("error") if isinstance(data.get("error"), dict) else {}
+    parts = compact(
+        {
+            "error_code": data.get("errorCode") or data.get("error_code") or error_payload.get("code"),
+            "error_type": data.get("errorType") or data.get("error_type") or error_payload.get("type"),
+            "message": (
+                data.get("errorMessage")
+                or data.get("error_message")
+                or data.get("message")
+                or error_payload.get("message")
+            ),
+            "request_id": data.get("requestId") or data.get("request_id"),
+            "job_id": data.get("jobId") or data.get("job_id"),
+            "status": data.get("status"),
+            "status_code": data.get("statusCode") or data.get("status_code"),
+        }
+    )
+    return json.dumps(parts, ensure_ascii=False) if parts else raw[:1000]
 
 
 def is_terminal_job(status: str) -> bool:

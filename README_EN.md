@@ -145,7 +145,7 @@ Use the update guide:
 Update Video AI Agent Skill: https://raw.githubusercontent.com/YaJee666/video_ai_agent_skill/main/docs/update.md
 ```
 
-The update flow can use the local repo, an installed skill copy, or the cached checkout under `~/.video-ai-agent-skill/repo`. If no source checkout exists yet, the updater bootstraps one from GitHub, then resyncs the skill folder and preserves installed `.env` files. You can also point it at a custom checkout with `--source-repo`.
+Run the update command from a repository checkout. The updater runs `git pull --ff-only`, then resyncs the `video-ai-agent` skill folder and preserves installed `.env` files, so your API key does not need to be re-entered.
 
 ## Why Online Parsing Helps
 

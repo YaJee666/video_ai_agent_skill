@@ -10,48 +10,41 @@ Update Video AI Agent Skill: https://raw.githubusercontent.com/YaJee666/video_ai
 
 The update flow preserves the installed `.env` file, so your API key does not need to be entered again.
 
-## What the updater does
+## Important
 
-`python scripts/install_skill.py --target auto --update` now works from:
+Run the update command from a cloned repository checkout, not from an installed skill directory such as `~/.codex/skills/video-ai-agent`.
 
-- the repo checkout
-- an installed Codex / Claude Code skill copy
-- a cached source checkout under `~/.video-ai-agent-skill/repo`
+The installed skill folder only contains the client script and docs. It does not contain `scripts/install_skill.py`.
 
-If no source checkout exists yet, the script bootstraps one from:
-
-```text
-https://github.com/YaJee666/video_ai_agent_skill.git
-```
-
-You can override the source checkout with:
+If you do not already have a checkout, clone one first:
 
 ```powershell
-python scripts/install_skill.py --source-repo "C:\path\to\video_ai_agent_skill" --target auto --update
+git clone https://github.com/YaJee666/video_ai_agent_skill.git "$env:USERPROFILE\.video-ai-agent-skill\repo"
+Set-Location "$env:USERPROFILE\.video-ai-agent-skill\repo"
 ```
 
 ## Recommended update flow
 
-Preview:
+Preview the update:
 
 ```powershell
-python scripts/install_skill.py --target auto --update --dry-run
+python .\scripts\install_skill.py --target auto --update --dry-run
 ```
 
-Apply:
+Apply the update:
 
 ```powershell
-python scripts/install_skill.py --target auto --update
+python .\scripts\install_skill.py --target auto --update
 ```
 
 Update every known skill root:
 
 ```powershell
-python scripts/install_skill.py --target all --update
+python .\scripts\install_skill.py --target all --update
 ```
 
 ## Notes
 
 - `.env` files are preserved during resync.
+- `--target auto` updates any detected Codex / Claude Code / `.agents` / OpenClaw skill roots, or creates the Codex root when none exist.
 - Start a new Codex / Claude Code session after the update if the running session does not pick up the new skill metadata.
-- Use `--source-repo` when you want to point at a specific local checkout or mirror.

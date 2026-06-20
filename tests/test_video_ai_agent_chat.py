@@ -174,6 +174,26 @@ class VideoAiAgentChatClientTest(unittest.TestCase):
         self.assertEqual("agent_skill_jobs", payload["metadata"]["request_source"])
         self.assertEqual("req-test", payload["runtimeContext"]["request_id"])
 
+    def test_summarize_http_error_prefers_structured_backend_fields(self):
+        raw = self.client.json.dumps(
+            {
+                "jobId": "job-1",
+                "requestId": "req-test",
+                "status": "failed",
+                "statusCode": 400,
+                "errorCode": "workflow_preset_not_found",
+                "errorType": "openapi_request",
+                "errorMessage": "Workflow preset not found",
+            }
+        )
+
+        message = self.client.summarize_http_error(raw)
+
+        self.assertIn("workflow_preset_not_found", message)
+        self.assertIn("Workflow preset not found", message)
+        self.assertIn("req-test", message)
+        self.assertIn("job-1", message)
+
     def test_run_job_polls_until_terminal_status(self):
         payload = {"requestId": "req-test"}
         responses = [
