@@ -147,13 +147,19 @@ ${EDITOR:-vi} ~/.codex/skills/video-ai-agent/.env
 Optional settings:
 
 ```text
-VIDEO_AI_AGENT_ENDPOINT=http://www.talkaibot.com/openapi/v1/chat/completions
+VIDEO_AI_AGENT_ENDPOINT=https://www.talkaibot.com/openapi/v1/chat/completions
 VIDEO_AI_AGENT_TIMEOUT_MS=600000
 VIDEO_AI_AGENT_PROJECT_ID=
 VIDEO_AI_AGENT_SESSION_ID=
 ```
 
-The client script loads `.env` from the current directory, the installed skill root, or the repository root. Precedence is: `.env` > shell environment > CLI args.
+The client script loads `.env` from the current directory, the installed skill root, or the repository root. Precedence is: CLI args > shell environment > `.env` > defaults.
+
+To inspect resolved configuration without sending a request:
+
+```powershell
+python .\video-ai-agent\scripts\video_ai_agent_chat.py --debug-config
+```
 
 ### Step 4: Verify
 

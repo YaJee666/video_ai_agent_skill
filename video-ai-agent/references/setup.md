@@ -51,13 +51,19 @@ notepad "$env:USERPROFILE\.codex\skills\video-ai-agent\.env"
 
 ```text
 VIDEO_AI_AGENT_API_KEY=vag_sk_live_xxx
-VIDEO_AI_AGENT_ENDPOINT=http://www.talkaibot.com/openapi/v1/chat/completions
+VIDEO_AI_AGENT_ENDPOINT=https://www.talkaibot.com/openapi/v1/chat/completions
 VIDEO_AI_AGENT_TIMEOUT_MS=600000
 VIDEO_AI_AGENT_PROJECT_ID=proj_xxx
 VIDEO_AI_AGENT_SESSION_ID=
 ```
 
 The client script loads `.env` from the installed skill directory and from the current working directory hierarchy. Precedence is: CLI args > shell environment > `.env` > defaults.
+
+To inspect resolved configuration without sending a request:
+
+```powershell
+python .\scripts\video_ai_agent_chat.py --debug-config
+```
 
 ## Verify
 

@@ -104,13 +104,19 @@ notepad "$env:USERPROFILE\.codex\skills\video-ai-agent\.env"
 
 ```text
 VIDEO_AI_AGENT_API_KEY=vag_sk_live_xxx
-VIDEO_AI_AGENT_ENDPOINT=http://www.talkaibot.com/openapi/v1/chat/completions
+VIDEO_AI_AGENT_ENDPOINT=https://www.talkaibot.com/openapi/v1/chat/completions
 VIDEO_AI_AGENT_TIMEOUT_MS=600000
 VIDEO_AI_AGENT_PROJECT_ID=
 VIDEO_AI_AGENT_SESSION_ID=
 ```
 
-脚本会自动读取当前目录、skill 目录或仓库根目录下的 `.env`。优先级是：`.env` 文件 > 系统环境变量 > 命令行参数。
+脚本会自动读取当前目录、skill 目录或仓库根目录下的 `.env`。优先级是：命令行参数 > 系统环境变量 > `.env` 文件 > 默认值。
+
+无需发送请求即可检查配置来源：
+
+```powershell
+python .\video-ai-agent\scripts\video_ai_agent_chat.py --debug-config
+```
 
 临时使用也可以继续设置环境变量：
 

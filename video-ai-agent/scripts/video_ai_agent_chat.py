@@ -4,8 +4,11 @@
 from __future__ import annotations
 
 import argparse
+import http.client
 import json
 import os
+import socket
+import ssl
 import sys
 import time
 import uuid
@@ -15,10 +18,11 @@ from pathlib import Path
 from typing import Any
 
 
-DEFAULT_ENDPOINT = "http://www.talkaibot.com/openapi/v1/chat/completions"
+DEFAULT_ENDPOINT = "https://www.talkaibot.com/openapi/v1/chat/completions"
 DEFAULT_TIMEOUT_MS = 600000
 SKILL_ID = "video-ai-agent"
 DOTENV_VALUES: dict[str, str] = {}
+DOTENV_SOURCES: dict[str, str] = {}
 
 
 def configure_utf8_output() -> None:
@@ -80,11 +84,15 @@ def discover_dotenv_paths(script_path: Path, cwd: Path) -> list[Path]:
 
 
 def load_dotenv() -> None:
-    global DOTENV_VALUES
+    global DOTENV_VALUES, DOTENV_SOURCES
     DOTENV_VALUES = {}
+    DOTENV_SOURCES = {}
     script_path = Path(__file__).resolve()
     for candidate in discover_dotenv_paths(script_path, Path.cwd()):
-        DOTENV_VALUES.update(load_dotenv_file(candidate))
+        values = load_dotenv_file(candidate)
+        DOTENV_VALUES.update(values)
+        for key in values:
+            DOTENV_SOURCES[key] = str(candidate)
 
 
 def env(name: str, default: str = "") -> str:
@@ -104,6 +112,19 @@ def resolve_config_value(cli_value: str | None, env_name: str, default: str = ""
     return str(default).strip()
 
 
+def resolve_config_source(cli_value: str | None, env_name: str, default: str = "") -> str:
+    if str(cli_value or "").strip():
+        return "cli"
+    if env(env_name):
+        return "environment"
+    if DOTENV_VALUES.get(env_name, "").strip():
+        source = DOTENV_SOURCES.get(env_name, ".env")
+        return f".env ({source})"
+    if str(default).strip():
+        return "default"
+    return "unset"
+
+
 def resolve_timeout_ms(cli_value: int | None) -> int:
     raw_value = resolve_config_value(
         str(cli_value) if cli_value is not None else "",
@@ -117,6 +138,17 @@ def resolve_timeout_ms(cli_value: int | None) -> int:
 
 
 def apply_config_precedence(args: argparse.Namespace) -> argparse.Namespace:
+    args.config_sources = {
+        "VIDEO_AI_AGENT_API_KEY": resolve_config_source(args.api_key, "VIDEO_AI_AGENT_API_KEY"),
+        "VIDEO_AI_AGENT_ENDPOINT": resolve_config_source(args.endpoint, "VIDEO_AI_AGENT_ENDPOINT", DEFAULT_ENDPOINT),
+        "VIDEO_AI_AGENT_TIMEOUT_MS": resolve_config_source(
+            str(args.timeout_ms) if args.timeout_ms is not None else "",
+            "VIDEO_AI_AGENT_TIMEOUT_MS",
+            str(DEFAULT_TIMEOUT_MS),
+        ),
+        "VIDEO_AI_AGENT_PROJECT_ID": resolve_config_source(args.project_id, "VIDEO_AI_AGENT_PROJECT_ID"),
+        "VIDEO_AI_AGENT_SESSION_ID": resolve_config_source(args.session_id, "VIDEO_AI_AGENT_SESSION_ID"),
+    }
     args.api_key = resolve_config_value(args.api_key, "VIDEO_AI_AGENT_API_KEY")
     args.endpoint = resolve_config_value(args.endpoint, "VIDEO_AI_AGENT_ENDPOINT", DEFAULT_ENDPOINT)
     args.timeout_ms = resolve_timeout_ms(args.timeout_ms)
@@ -145,6 +177,16 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--request-id", default="", help="Optional request id.")
     parser.add_argument("--title", default="", help="Optional chat title.")
     parser.add_argument("--metadata", default="", help="Optional JSON object merged into request metadata.")
+    parser.add_argument(
+        "--debug-config",
+        action="store_true",
+        help="Print resolved configuration sources with secrets masked, then exit.",
+    )
+    parser.add_argument(
+        "--dry-run-config",
+        action="store_true",
+        help="Alias for --debug-config.",
+    )
     parser.add_argument("--json", action="store_true", help="Print the full JSON response.")
     parser.add_argument("--message", default="", help="User instruction. If omitted, stdin is used.")
     return parser.parse_args()
@@ -199,6 +241,56 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
     )
 
 
+def mask_secret(value: str) -> str:
+    normalized = str(value or "").strip()
+    if not normalized:
+        return "<missing>"
+    if len(normalized) <= 10:
+        return normalized[:2] + "***"
+    return normalized[:7] + "..." + normalized[-4:]
+
+
+def render_config_debug(args: argparse.Namespace) -> str:
+    sources = getattr(args, "config_sources", {})
+    values = {
+        "VIDEO_AI_AGENT_API_KEY": (
+            mask_secret(args.api_key),
+            sources.get("VIDEO_AI_AGENT_API_KEY", "unknown"),
+        ),
+        "VIDEO_AI_AGENT_ENDPOINT": (
+            args.endpoint or "<missing>",
+            sources.get("VIDEO_AI_AGENT_ENDPOINT", "unknown"),
+        ),
+        "VIDEO_AI_AGENT_TIMEOUT_MS": (
+            str(args.timeout_ms),
+            sources.get("VIDEO_AI_AGENT_TIMEOUT_MS", "unknown"),
+        ),
+        "VIDEO_AI_AGENT_PROJECT_ID": (
+            args.project_id or "<empty>",
+            sources.get("VIDEO_AI_AGENT_PROJECT_ID", "unknown"),
+        ),
+        "VIDEO_AI_AGENT_SESSION_ID": (
+            args.session_id or "<empty>",
+            sources.get("VIDEO_AI_AGENT_SESSION_ID", "unknown"),
+        ),
+    }
+    lines = ["Video AI Agent config:"]
+    for name, (value, source) in values.items():
+        lines.append(f"{name}={value} source={source}")
+    return "\n".join(lines)
+
+
+def request_debug(payload: dict[str, Any], endpoint: str, timeout_ms: int) -> str:
+    request_id = str(payload.get("requestId") or "").strip()
+    suffix = []
+    if request_id:
+        suffix.append(f"request_id={request_id}")
+    if endpoint:
+        suffix.append(f"endpoint={endpoint}")
+    suffix.append(f"timeout_ms={timeout_ms}")
+    return " ".join(suffix)
+
+
 def post_json(endpoint: str, api_key: str, payload: dict[str, Any], timeout_ms: int) -> dict[str, Any]:
     if not api_key:
         raise SystemExit("VIDEO_AI_AGENT_API_KEY is required, or pass --api-key.")
@@ -221,12 +313,24 @@ def post_json(endpoint: str, api_key: str, payload: dict[str, Any], timeout_ms: 
             raw = response.read().decode("utf-8", errors="replace")
     except urllib.error.HTTPError as exc:
         raw = exc.read().decode("utf-8", errors="replace")
-        message = raw[:1000] if raw else exc.reason
-        raise SystemExit(f"Video AI Agent HTTP {exc.code}: {message}") from exc
+        message = raw[:1000] if raw else str(exc.reason or "Service Unavailable")
+        detail = request_debug(payload, endpoint, timeout_ms)
+        raise SystemExit(f"Video AI Agent HTTP {exc.code}: {message}\n[video_ai_agent] {detail}") from exc
     except urllib.error.URLError as exc:
-        raise SystemExit(f"Video AI Agent request failed: {exc.reason}") from exc
+        detail = request_debug(payload, endpoint, timeout_ms)
+        raise SystemExit(f"Video AI Agent request failed: {exc.reason}\n[video_ai_agent] {detail}") from exc
+    except http.client.RemoteDisconnected as exc:
+        detail = request_debug(payload, endpoint, timeout_ms)
+        raise SystemExit(
+            "Video AI Agent request failed: remote server closed the connection without a response.\n"
+            f"[video_ai_agent] {detail}"
+        ) from exc
+    except (ConnectionResetError, ssl.SSLError, socket.timeout, OSError) as exc:
+        detail = request_debug(payload, endpoint, timeout_ms)
+        raise SystemExit(f"Video AI Agent transport failed: {exc}\n[video_ai_agent] {detail}") from exc
     except TimeoutError as exc:
-        raise SystemExit(f"Video AI Agent request timed out after {timeout_ms}ms") from exc
+        detail = request_debug(payload, endpoint, timeout_ms)
+        raise SystemExit(f"Video AI Agent request timed out after {timeout_ms}ms\n[video_ai_agent] {detail}") from exc
 
     try:
         data = json.loads(raw) if raw else {}
@@ -261,6 +365,9 @@ def main() -> int:
     configure_utf8_output()
     load_dotenv()
     args = apply_config_precedence(parse_args())
+    if args.debug_config or args.dry_run_config:
+        print(render_config_debug(args))
+        return 0
     payload = build_payload(args)
     data = post_json(args.endpoint.strip(), args.api_key.strip(), payload, args.timeout_ms)
     if args.json:

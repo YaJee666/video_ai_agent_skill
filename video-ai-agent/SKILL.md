@@ -20,7 +20,7 @@ Minimum key scope:
 Default endpoint:
 
 ```text
-http://www.talkaibot.com/openapi/v1/chat/completions
+https://www.talkaibot.com/openapi/v1/chat/completions
 ```
 
 Supported authentication headers on the backend:
@@ -66,6 +66,12 @@ Configuration precedence is `CLI arguments > shell environment > .env > defaults
 python scripts/video_ai_agent_chat.py \
   --api-key "vag_sk_live_xxx" \
   --message "For https://www.youtube.com/watch?v=..., list the main points and practical takeaways."
+```
+
+To verify configuration without sending a request, use:
+
+```bash
+python scripts/video_ai_agent_chat.py --debug-config
 ```
 
 ## Workflow

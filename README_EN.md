@@ -100,13 +100,19 @@ Example `.env`:
 
 ```text
 VIDEO_AI_AGENT_API_KEY=vag_sk_live_xxx
-VIDEO_AI_AGENT_ENDPOINT=http://www.talkaibot.com/openapi/v1/chat/completions
+VIDEO_AI_AGENT_ENDPOINT=https://www.talkaibot.com/openapi/v1/chat/completions
 VIDEO_AI_AGENT_TIMEOUT_MS=600000
 VIDEO_AI_AGENT_PROJECT_ID=
 VIDEO_AI_AGENT_SESSION_ID=
 ```
 
-The client loads `.env` from the current directory, the installed skill root, or the repository root. Priority is: `.env` file > shell environment > CLI arguments.
+The client loads `.env` from the current directory, the installed skill root, or the repository root. Priority is: CLI arguments > shell environment > `.env` file > defaults.
+
+To inspect resolved configuration without sending a request:
+
+```powershell
+python .\video-ai-agent\scripts\video_ai_agent_chat.py --debug-config
+```
 
 You can still set temporary environment variables:
 
