@@ -87,6 +87,22 @@ Video smoke test:
 python .\scripts\video_ai_agent_chat.py --message "Please summarize this video in Chinese: https://www.bilibili.com/video/BV..."
 ```
 
+Local audio upload and segment transcription:
+
+```powershell
+python .\scripts\video_ai_agent_chat.py `
+  --audio-file "C:\media\lesson.m4a" `
+  --message "转写这个音频 2:20 到 2:40 的内容"
+```
+
+Local audio transcript-based writing:
+
+```powershell
+python .\scripts\video_ai_agent_chat.py `
+  --audio-file "C:\media\interview.mp3" `
+  --write-from-audio
+```
+
 ## Notes
 
 - Do not commit API keys to a repository.
@@ -96,5 +112,7 @@ python .\scripts\video_ai_agent_chat.py --message "Please summarize this video i
 - Use `sessionId` only when the user wants continuity across requests.
 - Use `projectId` only when the key's workspace owns that project.
 - Keep `VIDEO_AI_AGENT_MODE=jobs` for long video parsing, summarization, transcript cleanup, and Q&A.
+- Local audio uploads automatically switch the request to sync mode after `POST /openapi/v1/files`.
+- Use `--resource-id <id>` to reuse a previously uploaded audio resource without uploading it again.
 - Use `--mode sync` only for short chat-completion requests.
 - Increase `VIDEO_AI_AGENT_TIMEOUT_MS` if the job polling window is too short.

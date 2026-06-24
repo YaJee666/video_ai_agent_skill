@@ -1,7 +1,9 @@
 import argparse
 import http.client
 import importlib.util
+import tempfile
 import unittest
+import urllib.parse
 from pathlib import Path
 from unittest import mock
 
@@ -122,6 +124,89 @@ class VideoAiAgentChatClientTest(unittest.TestCase):
         self.assertEqual("N9iLEhievoM", payload["context"]["videoId"])
         self.assertEqual("youtube", payload["metadata"]["platform"])
         self.assertEqual("N9iLEhievoM", payload["metadata"]["video_id"])
+
+    def test_build_payload_attaches_uploaded_resource_ids(self):
+        args = argparse.Namespace(
+            request_id="req-audio",
+            project_id="",
+            session_id="session-audio",
+            thread_id="",
+            title="",
+            message="转写音频 2:20 到 2:40",
+            metadata="",
+            resource_id=["88", "99"],
+            write_from_audio=False,
+        )
+
+        payload = self.client.build_payload(args)
+
+        self.assertEqual([{"id": 88}, {"id": 99}], payload["attachments"])
+
+    def test_build_payload_uses_default_audio_writing_prompt(self):
+        args = argparse.Namespace(
+            request_id="req-write",
+            project_id="",
+            session_id="",
+            thread_id="",
+            title="",
+            message="",
+            metadata="",
+            resource_id=["88"],
+            write_from_audio=True,
+        )
+
+        with mock.patch.object(self.client.sys, "stdin") as stdin:
+            stdin.read.return_value = ""
+            payload = self.client.build_payload(args)
+
+        self.assertIn("完整转写", payload["messageContent"])
+        self.assertIn("撰写一篇", payload["messageContent"])
+
+    def test_post_multipart_file_uploads_audio_and_returns_resource_id(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            audio_path = Path(temp_dir) / "课程片段.m4a"
+            audio_path.write_bytes(b"audio-bytes")
+            response = self._json_response({"id": 88, "resourceId": 88, "fileName": audio_path.name})
+
+            with mock.patch.object(self.client.urllib.request, "urlopen", return_value=response) as urlopen:
+                result = self.client.post_multipart_file(
+                    "https://www.talkaibot.com/openapi/v1/files",
+                    "vag_sk_test",
+                    audio_path,
+                    60000,
+                    "req-upload",
+                )
+
+        self.assertEqual(88, result["resourceId"])
+        request = urlopen.call_args.args[0]
+        self.assertEqual("POST", request.method)
+        self.assertEqual("vag_sk_test", request.headers["X-api-key"])
+        self.assertEqual("req-upload", request.headers["X-request-id"])
+        self.assertIn("multipart/form-data", request.headers["Content-type"])
+        self.assertIn(b"audio-bytes", request.data)
+        self.assertIn(
+            "课程片段.m4a",
+            urllib.parse.unquote(request.data.decode("latin1", errors="ignore")),
+        )
+
+    def test_upload_audio_resource_adds_resource_id_to_args(self):
+        args = argparse.Namespace(
+            audio_file="C:/audio/lesson.m4a",
+            request_id="req-upload",
+            endpoint="https://www.talkaibot.com/openapi/v1/chat/completions",
+            api_key="vag_sk_test",
+            timeout_ms=60000,
+            resource_id=[],
+        )
+        with mock.patch.object(
+            self.client,
+            "post_multipart_file",
+            return_value={"resourceId": 123, "fileName": "lesson.m4a"},
+        ):
+            result = self.client.upload_audio_resource(args)
+
+        self.assertEqual(123, result["resourceId"])
+        self.assertEqual(["123"], args.resource_id)
 
     def test_remote_disconnect_error_includes_request_context(self):
         payload = {"requestId": "req_test_1", "messageContent": "hello"}

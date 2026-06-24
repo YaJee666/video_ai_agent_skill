@@ -223,6 +223,34 @@ python .\video-ai-agent\scripts\video_ai_agent_chat.py --timeout-ms 900000 --mes
 
 可以用 `--api-key`，但不推荐。更安全的方式是放到安装后 skill 目录的 `.env`、当前 shell 环境变量或你的本地 secrets 管理工具里，避免进入 shell history 或 Git。仓库里的 `.gitignore` 会忽略 `.env` 文件。
 
+## 本地音频上传、转写与撰写
+
+Skill 现在支持把本地 `mp3`、`m4a`、`wav`、`flac`、`aac`、`ogg`、`wma`
+音频上传到 Video AI Agent。服务端返回 `resourceId` 后，客户端会自动把该资源附加到聊天请求，
+由后端按用户指定的时间范围使用 FFmpeg 裁剪，再通过 Whisper 转写。
+
+转写指定片段：
+
+```powershell
+python .\video-ai-agent\scripts\video_ai_agent_chat.py `
+  --audio-file "C:\media\lesson.m4a" `
+  --message "转写这个音频 2:20 到 2:40 的内容，输出整理后的口语稿"
+```
+
+基于音频撰写文章：
+
+```powershell
+python .\video-ai-agent\scripts\video_ai_agent_chat.py `
+  --audio-file "C:\media\interview.mp3" `
+  --write-from-audio
+```
+
+也可以在 `--message` 中提出更具体的撰写要求，例如课程讲义、会议纪要、博客文章、
+内容提纲或问答总结。已有资源可以使用 `--resource-id 123` 复用。
+
+音频附件当前自动使用同步聊天接口；默认 jobs 模式仍用于在线视频长任务。
+API key 需要 `chat:write` scope。
+
 ## License
 
 MIT

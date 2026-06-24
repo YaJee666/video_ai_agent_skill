@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import http.client
 import json
+import mimetypes
 import os
 import re
 import socket
@@ -219,6 +220,22 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--json", action="store_true", help="Print the full JSON response.")
     parser.add_argument("--message", default="", help="User instruction. If omitted, stdin is used.")
+    parser.add_argument(
+        "--audio-file",
+        default="",
+        help="Upload a local audio file, then attach its resource id to the request.",
+    )
+    parser.add_argument(
+        "--resource-id",
+        action="append",
+        default=[],
+        help="Attach an existing uploaded resource id. May be repeated.",
+    )
+    parser.add_argument(
+        "--write-from-audio",
+        action="store_true",
+        help="Use a default Chinese transcript-and-writing instruction when --message is omitted.",
+    )
     return parser.parse_args()
 
 
@@ -306,6 +323,11 @@ def extract_first_supported_video_source(message: str) -> dict[str, str]:
 
 def build_payload(args: argparse.Namespace) -> dict[str, Any]:
     message = arg_text(args, "message") or sys.stdin.read().strip()
+    if not message and bool(getattr(args, "write_from_audio", False)):
+        message = (
+            "请先完整转写上传音频的口语内容，再基于转写撰写一篇结构清晰的中文文章。"
+            "文章需要包含标题、内容提要、分节正文和关键结论；不要编造音频中没有的信息。"
+        )
     if not message:
         raise SystemExit("message is required. Pass --message or pipe text on stdin.")
 
@@ -332,6 +354,13 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
         }
     )
 
+    resource_ids = [
+        str(item).strip()
+        for item in (getattr(args, "resource_id", None) or [])
+        if str(item).strip()
+    ]
+    attachments = [{"id": int(item)} for item in resource_ids]
+
     return compact(
         {
             "requestId": request_id,
@@ -345,6 +374,7 @@ def build_payload(args: argparse.Namespace) -> dict[str, Any]:
             "video_url": video_source.get("video_url", ""),
             "video_id": video_source.get("video_id", ""),
             "platform": video_source.get("platform", ""),
+            "attachments": attachments,
             "metadata": metadata,
         }
     )
@@ -462,6 +492,82 @@ def post_json(endpoint: str, api_key: str, payload: dict[str, Any], timeout_ms: 
     if not isinstance(data, dict):
         raise SystemExit("Video AI Agent returned an unexpected JSON value")
     return data
+
+
+def post_multipart_file(
+    endpoint: str,
+    api_key: str,
+    file_path: Path,
+    timeout_ms: int,
+    request_id: str = "",
+) -> dict[str, Any]:
+    if not api_key:
+        raise SystemExit("VIDEO_AI_AGENT_API_KEY is required, or pass --api-key.")
+    resolved_path = file_path.expanduser().resolve()
+    if not resolved_path.is_file():
+        raise SystemExit(f"Audio file was not found: {resolved_path}")
+    if timeout_ms < 1000:
+        raise SystemExit("--timeout-ms must be at least 1000.")
+
+    boundary = f"----VideoAIAgentBoundary{uuid.uuid4().hex}"
+    content_type = mimetypes.guess_type(resolved_path.name)[0] or "application/octet-stream"
+    safe_ascii_name = re.sub(r"[^A-Za-z0-9._-]+", "_", resolved_path.name) or "audio"
+    encoded_name = urllib.parse.quote(resolved_path.name, safe="")
+    prefix = (
+        f"--{boundary}\r\n"
+        "Content-Disposition: form-data; name=\"file\"; "
+        f"filename=\"{safe_ascii_name}\"; filename*=UTF-8''{encoded_name}\r\n"
+        f"Content-Type: {content_type}\r\n\r\n"
+    ).encode("utf-8")
+    suffix = f"\r\n--{boundary}--\r\n".encode("ascii")
+    body = prefix + resolved_path.read_bytes() + suffix
+    headers = {
+        "Content-Type": f"multipart/form-data; boundary={boundary}",
+        "Content-Length": str(len(body)),
+        "X-API-Key": api_key,
+    }
+    if request_id:
+        headers["X-Request-Id"] = request_id
+    request = urllib.request.Request(endpoint, data=body, headers=headers, method="POST")
+    payload = {"requestId": request_id, "fileName": resolved_path.name}
+    try:
+        with urllib.request.urlopen(request, timeout=timeout_ms / 1000) as response:
+            raw = response.read().decode("utf-8", errors="replace")
+    except urllib.error.HTTPError as exc:
+        raw = exc.read().decode("utf-8", errors="replace")
+        message = summarize_http_error(raw) or str(exc.reason or "File upload failed")
+        detail = request_debug(payload, endpoint, timeout_ms)
+        raise SystemExit(f"Video AI Agent upload HTTP {exc.code}: {message}\n[video_ai_agent] {detail}") from exc
+    except (urllib.error.URLError, http.client.RemoteDisconnected, ConnectionResetError, ssl.SSLError, socket.timeout, OSError) as exc:
+        detail = request_debug(payload, endpoint, timeout_ms)
+        raise SystemExit(f"Video AI Agent upload failed: {exc}\n[video_ai_agent] {detail}") from exc
+
+    try:
+        data = json.loads(raw) if raw else {}
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"Video AI Agent upload returned non-JSON content: {raw[:1000]}") from exc
+    if not isinstance(data, dict):
+        raise SystemExit("Video AI Agent upload returned an unexpected JSON value")
+    return data
+
+
+def upload_audio_resource(args: argparse.Namespace) -> dict[str, Any] | None:
+    raw_path = arg_text(args, "audio_file")
+    if not raw_path:
+        return None
+    request_id = arg_text(args, "request_id") or f"req_upload_{int(time.time() * 1000)}_{uuid.uuid4().hex[:8]}"
+    result = post_multipart_file(
+        derive_endpoint(args.endpoint.strip(), "files"),
+        args.api_key.strip(),
+        Path(raw_path),
+        args.timeout_ms,
+        request_id,
+    )
+    resource_id = result.get("resourceId") or result.get("id")
+    if resource_id is None:
+        raise SystemExit("Video AI Agent upload response did not include resourceId")
+    args.resource_id = [*(getattr(args, "resource_id", None) or []), str(resource_id)]
+    return result
 
 
 def get_json(endpoint: str, api_key: str, payload: dict[str, Any], timeout_ms: int) -> dict[str, Any]:
@@ -629,7 +735,10 @@ def main() -> int:
     if args.debug_config or args.dry_run_config:
         print(render_config_debug(args))
         return 0
+    upload_result = upload_audio_resource(args)
     payload = build_payload(args)
+    if payload.get("attachments"):
+        args.mode = "sync"
     if args.mode == "jobs":
         data = run_job(
             args.endpoint.strip(),
@@ -641,7 +750,8 @@ def main() -> int:
     else:
         data = post_json(args.endpoint.strip(), args.api_key.strip(), payload, args.timeout_ms)
     if args.json:
-        print(json.dumps(data, ensure_ascii=False, indent=2))
+        output = {"upload": upload_result, "result": data} if upload_result else data
+        print(json.dumps(output, ensure_ascii=False, indent=2))
     else:
         print(render_text(data))
     return 0

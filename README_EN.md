@@ -7,6 +7,7 @@ Video AI Agent Skill is a lightweight folder-based skill. It does not download, 
 ## Highlights
 
 - **Online video intelligence**: Send Bilibili, YouTube, Douyin, TikTok, and direct media URLs to Codex / Claude Code and get summaries, key claims, Q&A, and comparisons through one interface.
+- **Local audio upload**: Upload MP3/M4A/WAV and related audio files, receive a resource ID, transcribe exact time ranges with backend Whisper, and write articles or notes from the transcript.
 - **Zero local heavy dependencies**: No local GPU, Whisper, ffmpeg, yt-dlp, site scrapers, or cookie handling required.
 - **Agent-friendly**: The skill ships with `SKILL.md`, a dependency-free Python client, and short docs that agents can understand directly.
 - **More reliable online parsing**: Video downloading, transcription, and cleanup happen on the service side instead of fighting platform quirks locally.
@@ -127,6 +128,22 @@ From the repository root:
 
 ```powershell
 python .\video-ai-agent\scripts\video_ai_agent_chat.py --message "Please summarize this video in Chinese: https://www.bilibili.com/video/BV..."
+```
+
+Upload a local audio file and transcribe a time range:
+
+```powershell
+python .\video-ai-agent\scripts\video_ai_agent_chat.py `
+  --audio-file "C:\media\lesson.m4a" `
+  --message "Transcribe 2:20 to 2:40 and return a cleaned spoken script."
+```
+
+Write an article grounded in uploaded audio:
+
+```powershell
+python .\video-ai-agent\scripts\video_ai_agent_chat.py `
+  --audio-file "C:\media\interview.mp3" `
+  --write-from-audio
 ```
 
 Or use the skill directly:
